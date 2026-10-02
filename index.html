@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔐 نظام إخفاء الرسائل في الصور</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+body {
+    background: linear-gradient(135deg, #0a0e27, #1a1f4a);
+    color: #fff;
+    min-height: 100vh;
+    padding: 20px;
+}
+.container { max-width: 900px; margin: 0 auto; }
+
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 25px;
+    background: rgba(0, 220, 200, 0.1);
+    border: 2px solid rgba(0, 220, 200, 0.3);
+    border-radius: 20px;
+}
+.header h1 {
+    font-size: 36px;
+    background: linear-gradient(90deg, #00dcc8, #a064ff, #ff64b4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p { color: #8892c0; font-size: 15px; }
+
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.tab {
+    flex: 1;
+    padding: 18px;
+    font-size: 17px;
+    font-weight: bold;
+    border: 2px solid rgba(100, 120, 200, 0.3);
+    background: rgba(20, 25, 55, 0.7);
+    color: #8892c0;
+    border-radius: 15px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.3s;
+}
+.tab.active {
+    background: linear-gradient(135deg, #00dcc8, #a064ff);
+    color: #fff;
+    border-color: transparent;
+}
+.tab:hover:not(.active) { border-color: rgba(0, 220, 200, 0.4); }
+
+.panel {
+    background: rgba(20, 25, 55, 0.7);
+    border: 1px solid rgba(100, 120, 200, 0.2);
+    border-radius: 20px;
+    padding: 30px;
+    backdrop-filter: blur(20px);
+}
+.panel h2 {
+    font-size: 22px;
+    margin-bottom: 20px;
+    color: #00dcc8;
+}
+.hidden { display: none !important; }
+
+.form-group { margin-bottom: 20px; }
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #a0a8d0;
+    font-weight: 600;
+}
+input[type="text"], input[type="password"], textarea {
+    width: 100%;
+    padding: 15px;
+    font-size: 15px;
+    color: #fff;
+    background: rgba(10, 15, 35, 0.9);
+    border: 2px solid rgba(100, 120, 200, 0.3);
+    border-radius: 12px;
+    outline: none;
+    font-family: inherit;
+    transition: all 0.2s;
+    resize: vertical;
+}
+input:focus, textarea:focus {
+    border-color: #00dcc8;
+    box-shadow: 0 0 0 4px rgba(0, 220, 200, 0.15);
+}
+textarea { min-height: 120px; line-height: 1.7; }
+input::placeholder, textarea::placeholder { color: #566; }
+
+.file-input-wrapper {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+    width: 100%;
+}
+.file-input-wrapper input[type="file"] {
+    position: absolute;
+    left: -9999px;
+}
+.file-label {
+    display: block;
+    padding: 40px 20px;
+    background: rgba(0, 220, 200, 0.05);
+    border: 2px dashed rgba(0, 220, 200, 0.4);
+    border-radius: 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.file-label:hover {
+    border-color: #00dcc8;
+    background: rgba(0, 220, 200, 0.1);
+}
+.file-icon { font-size: 50px; margin-bottom: 10px; }
+.file-label p { color: #8892c0; font-size: 14px; }
+.file-name {
+    display: block;
+    margin-top: 10px;
+    color: #00dcc8;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+.btn {
+    width: 100%;
+    padding: 18px;
+    font-size: 17px;
+    font-weight: bold;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+.btn-primary {
+    background: linear-gradient(135deg, #00dcc8, #a064ff);
+    color: #fff;
+    box-shadow: 0 8px 25px rgba(160, 100, 255, 0.4);
+}
+.btn-primary:active { transform: scale(0.97); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.result {
+    margin-top: 20px;
+    padding: 20px;
+    border-radius: 15px;
+    display: none;
+}
+.result.success {
+    background: rgba(100, 255, 150, 0.1);
+    border: 2px solid rgba(100, 255, 150, 0.4);
+    display: block;
+}
+.result.error {
+    background: rgba(255, 80, 80, 0.1);
+    border: 2px solid rgba(255, 80, 80, 0.4);
+    display: block;
+}
+.result h3 { margin-bottom: 10px; }
+.result.success h3 { color: #64ff96; }
+.result.error h3 { color: #ff5050; }
+.result p { color: #c0c0d0; font-size: 14px; line-height: 1.7; }
+
+.preview-image {
+    max-width: 100%;
+    margin-top: 15px;
+    border-radius: 12px;
+    border: 2px solid rgba(100, 120, 200, 0.3);
+}
+.download-btn {
+    display: inline-block;
+    margin-top: 15px;
+    padding: 12px 25px;
+    background: linear-gradient(135deg, #64ff96, #00aa55);
+    color: #fff;
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+.download-btn:active { transform: scale(0.97); }
+
+.info-box {
+    margin-top: 20px;
+    padding: 15px;
+    background: rgba(255, 215, 0, 0.08);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    border-radius: 12px;
+    font-size: 13px;
+    color: #ffd700;
+    line-height: 1.7;
+}
+.info-box strong { color: #ffd700; }
+
+.extracted-message {
+    margin-top: 15px;
+    padding: 20px;
+    background: rgba(0, 220, 200, 0.1);
+    border: 2px solid rgba(0, 220, 200, 0.3);
+    border-radius: 12px;
+    font-size: 16px;
+    color: #fff;
+    line-height: 1.8;
+    word-break: break-word;
+}
+.extracted-message .label {
+    display: block;
+    font-size: 12px;
+    color: #00dcc8;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <h1>🔐 نظام إخفاء الرسائل في الصور</h1>
+        <p>Steganography + AES-256 Encryption</p>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('hide')">🔒 إخفاء رسالة</button>
+        <button class="tab" onclick="switchTab('extract')">🔓 استخراج رسالة</button>
+    </div>
+
+    <!-- ═══ إخفاء رسالة ═══ -->
+    <div class="panel" id="hidePanel">
+        <h2>🔒 إخفاء رسالة سرية في صورة</h2>
+
+        <div class="form-group">
+            <label>📝 الرسالة السرية</label>
+            <textarea id="secretMessage" placeholder="اكتب الرسالة اللي عايز تخفيها..."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>🔑 كلمة المرور (للتشفير)</label>
+            <input type="password" id="hidePassword" placeholder="اكتب كلمة مرور قوية">
+        </div>
+
+        <div class="form-group">
+            <label>🖼️ اختر صورة (PNG أو JPG)</label>
+            <div class="file-input-wrapper">
+                <input type="file" id="hideImageInput" accept="image/*">
+                <label class="file-label" for="hideImageInput">
+                    <div class="file-icon">📁</div>
+                    <p>اضغط لاختيار صورة</p>
+                    <span class="file-name" id="hideFileName"></span>
+                </label>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" id="hideBtn" onclick="hideMessage()">
+            🔐 إخفاء الرسالة
+        </button>
+
+        <div class="result" id="hideResult"></div>
+    </div>
+
+    <!-- ═══ استخراج رسالة ═══ -->
+    <div class="panel hidden" id="extractPanel">
+        <h2>🔓 استخراج رسالة مخفية</h2>
+
+        <div class="form-group">
+            <label>🖼️ اختر الصورة (اللي فيها الرسالة)</label>
+            <div class="file-input-wrapper">
+                <input type="file" id="extractImageInput" accept="image/*">
+                <label class="file-label" for="extractImageInput">
+                    <div class="file-icon">📁</div>
+                    <p>اضغط لاختيار صورة</p>
+                    <span class="file-name" id="extractFileName"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>🔑 كلمة المرور</label>
+            <input type="password" id="extractPassword" placeholder="اكتب كلمة المرور">
+        </div>
+
+        <button class="btn btn-primary" id="extractBtn" onclick="extractMessage()">
+            🔍 استخراج الرسالة
+        </button>
+
+        <div class="result" id="extractResult"></div>
+    </div>
+
+    <div class="info-box">
+        <strong>📚 ملاحظة أكاديمية:</strong> هذا المشروع يستخدم تقنية
+        <strong>LSB Steganography</strong> لإخفاء البيانات في أقل بت أهمية لكل بكسل،
+        مع تشفير <strong>AES-256</strong> قبل الإخفاء. الجمع بين التقنيتين يوفر أماناً مضاعفاً:
+        حتى لو تم اكتشاف وجود رسالة مخفية، لن يستطيع أحد قراءتها بدون كلمة المرور.
+    </div>
+
+</div>
+
+<script>
+// ═══ إخفاء الرسالة ═══
+window.hideMessage = async function() {
+    const message = document.getElementById('secretMessage').value.trim();
+    const password = document.getElementById('hidePassword').value;
+    const fileInput = document.getElementById('hideImageInput');
+    const result = document.getElementById('hideResult');
+    const btn = document.getElementById('hideBtn');
+
+    if (!message) return showResult(result, 'error', '❌ اكتب الرسالة أولاً');
+    if (!password) return showResult(result, 'error', '❌ اكتب كلمة المرور');
+    if (!fileInput.files[0]) return showResult(result, 'error', '❌ اختر صورة');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ جاري المعالجة...';
+
+    try {
+        // 1. تشفير الرسالة
+        const encrypted = CryptoJS.AES.encrypt(message, password).toString();
+        const dataToHide = '<<<SECRET>>>' + encrypted + '<<<END>>>';
+
+        // 2. قراءة الصورة
+        const file = fileInput.files[0];
+        const img = await loadImage(file);
+
+        // 3. استخدام Canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = imageData.data;
+
+        // 4. تحويل الرسالة إلى بتات
+        const bits = stringToBits(dataToHide);
+
+        // 5. حساب السعة القصوى
+        const maxBits = Math.floor(pixels.length / 4) * 3; // 3 قنوات RGB لكل بكسل
+        if (bits.length > maxBits) {
+            throw new Error('الصورة صغيرة جداً للرسالة دي. جرب صورة أكبر أو رسالة أصغر.');
+        }
+
+        // 6. إخفاء البتات في LSB
+        let bitIndex = 0;
+        for (let i = 0; i < pixels.length && bitIndex < bits.length; i++) {
+            // تخطي قناة Alpha (index 3, 7, 11...)
+            if ((i + 1) % 4 === 0) continue;
+
+            // استبدال آخر بت
+            pixels[i] = (pixels[i] & 0xFE) | bits[bitIndex];
+            bitIndex++;
+        }
+
+        // 7. رسم الصورة الجديدة
+        ctx.putImageData(imageData, 0, 0);
+
+        // 8. تحويل إلى صورة قابلة للتحميل
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+
+            showResult(result, 'success', `
+                <h3>✅ تم إخفاء الرسالة بنجاح!</h3>
+                <p>الرسالة اتشفرت بـ AES-256 وتم إخفاؤها في الصورة.</p>
+                <p><strong>حجم الرسالة:</strong> ${message.length} حرف</p>
+                <p><strong>عدد البتات المستخدمة:</strong> ${bits.length}</p>
+                <img src="${url}" class="preview-image" alt="الصورة">
+                <a href="${url}" download="secret-image.png" class="download-btn">
+                    ⬇️ تحميل الصورة
+                </a>
+            `, '');
+
+            btn.disabled = false;
+            btn.textContent = '🔐 إخفاء الرسالة';
+        }, 'image/png');
+
+    } catch (error) {
+        showResult(result, 'error', '❌ خطأ: ' + error.message);
+        btn.disabled = false;
+        btn.textContent = '🔐 إخفاء الرسالة';
+    }
+};
+
+// ═══ استخراج الرسالة ═══
+window.extractMessage = async function() {
+    const fileInput = document.getElementById('extractImageInput');
+    const password = document.getElementById('extractPassword').value;
+    const result = document.getElementById('extractResult');
+    const btn = document.getElementById('extractBtn');
+
+    if (!fileInput.files[0]) return showResult(result, 'error', '❌ اختر صورة');
+    if (!password) return showResult(result, 'error', '❌ اكتب كلمة المرور');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ جاري الاستخراج...';
+
+    try {
+        const file = fileInput.files[0];
+        const img = await loadImage(file);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = imageData.data;
+
+        // استخراج البتات
+        const bits = [];
+        for (let i = 0; i < pixels.length; i++) {
+            if ((i + 1) % 4 === 0) continue;
+            bits.push(pixels[i] & 1);
+        }
+
+        // تحويل البتات إلى نص
+        const text = bitsToString(bits);
+
+        // البحث عن علامات البداية والنهاية
+        const start = text.indexOf('<<<SECRET>>>');
+        const end = text.indexOf('<<<END>>>');
+
+        if (start === -1 || end === -1) {
+            throw new Error('لا توجد رسالة مخفية في هذه الصورة');
+        }
+
+        const encrypted = text.substring(start + 12, end);
+
+        // فك التشفير
+        const decrypted = CryptoJS.AES.decrypt(encrypted, password).toString(CryptoJS.enc.Utf8);
+
+        if (!decrypted) {
+            throw new Error('كلمة المرور غير صحيحة');
+        }
+
+        showResult(result, 'success', `
+            <h3>✅ تم استخراج الرسالة بنجاح!</h3>
+            <div class="extracted-message">
+                <span class="label">📨 الرسالة السرية:</span>
+                ${escapeHtml(decrypted)}
+            </div>
+        `, '');
+
+        btn.disabled = false;
+        btn.textContent = '🔍 استخراج الرسالة';
+
+    } catch (error) {
+        showResult(result, 'error', '❌ ' + error.message);
+        btn.disabled = false;
+        btn.textContent = '🔍 استخراج الرسالة';
+    }
+};
+
+// ═══ أدوات مساعدة ═══
+function loadImage(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+function stringToBits(str) {
+    const bits = [];
+    for (let i = 0; i < str.length; i++) {
+        const charCode = str.charCodeAt(i);
+        for (let j = 15; j >= 0; j--) {
+            bits.push((charCode >> j) & 1);
+        }
+    }
+    return bits;
+}
+
+function bitsToString(bits) {
+    let str = '';
+    for (let i = 0; i < bits.length; i += 16) {
+        if (i + 16 > bits.length) break;
+        let charCode = 0;
+        for (let j = 0; j < 16; j++) {
+            charCode = (charCode << 1) | bits[i + j];
+        }
+        if (charCode === 0) break;
+        str += String.fromCharCode(charCode);
+    }
+    return str;
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function showResult(el, type, html) {
+    el.className = 'result ' + type;
+    el.innerHTML = html;
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
+
+    if (tab === 'hide') {
+        document.querySelectorAll('.tab')[0].classList.add('active');
+        document.getElementById('hidePanel').classList.remove('hidden');
+    } else {
+        document.querySelectorAll('.tab')[1].classList.add('active');
+        document.getElementById('extractPanel').classList.remove('hidden');
+    }
+}
+
+// عرض اسم الملف المختار
+document.getElementById('hideImageInput').addEventListener('change', function() {
+    document.getElementById('hideFileName').textContent = this.files[0]?.name || '';
+});
+document.getElementById('extractImageInput').addEventListener('change', function() {
+    document.getElementById('extractFileName').textContent = this.files[0]?.name || '';
+});
+</script>
+</body>
+</html>
